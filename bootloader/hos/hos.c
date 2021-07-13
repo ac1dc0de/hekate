@@ -125,6 +125,7 @@ static const u8 master_kekseed_t210b01[][SE_KEY_128_SIZE] = {
 	{ 0x5C, 0x24, 0xE3, 0xB8, 0xB4, 0xF7, 0x00, 0xC2, 0x3C, 0xFD, 0x0A, 0xCE, 0x13, 0xC3, 0xDC, 0x23 }, // 8.1.0.
 	{ 0x86, 0x69, 0xF0, 0x09, 0x87, 0xC8, 0x05, 0xAE, 0xB5, 0x7B, 0x48, 0x74, 0xDE, 0x62, 0xA6, 0x13 }, // 9.0.0.
 	{ 0x0E, 0x44, 0x0C, 0xED, 0xB4, 0x36, 0xC0, 0x3F, 0xAA, 0x1D, 0xAE, 0xBF, 0x62, 0xB1, 0x09, 0x82 }, // 9.1.0.
+	{ 0xE5, 0x41, 0xAC, 0xEC, 0xD1, 0xA7, 0xD1, 0xAB, 0xED, 0x03, 0x77, 0xF1, 0x27, 0xCA, 0xF8, 0xF1 }, // 12.1.0.
 };
 
 static const u8 console_keyseed[SE_KEY_128_SIZE] =
@@ -546,7 +547,7 @@ int hos_keygen(void *keyblob, u32 kb, tsec_ctxt_t *tsec_ctxt, launch_ctxt_t *hos
 		{
 			switch (kb)
 			{
-			case KB_FIRMWARE_VERSION_100_200:
+			case KB_FIRMWARE_VERSION_100:
 			case KB_FIRMWARE_VERSION_300:
 			case KB_FIRMWARE_VERSION_301:
 				se_aes_unwrap_key(13, 15, console_keyseed);
@@ -788,8 +789,9 @@ int hos_launch(ini_sec_t *cfg)
 		goto error;
 	}
 
-	// Check if fuses lower than 4.0.0 or 9.0.0 or 11.0.0 and if yes apply NO Gamecard patch.
-	// Additionally check if running emuMMC and disable GC if v3/v4 fuses are burnt and HOS is <= 8.1.0 or != 11.0.0.
+	// If Auto NOGC is enabled, check if burnt fuses lower than installed HOS fuses and apply NOGC patch.
+	// For emuMMC, unconditionally enable NOGC when burnt fuses are higher than installed HOS fuses.
+	// Disable Auto NOGC in stock to prevent black screen (fatal error). Use kip1patch=nogc to force it.
 	if (!ctxt.stock)
 	{
 		u32 fuses = fuse_read_odm(7);
@@ -807,7 +809,7 @@ int hos_launch(ini_sec_t *cfg)
 				((fuses & 0x400)  && (ctxt.pkg1_id->fuses <= 10)) || // HOS  9.0.0+ fuses burnt.
 				((fuses & 0x2000) && (ctxt.pkg1_id->fuses <= 13)) || // HOS 11.0.0+ fuses burnt.
 				// Detection broken! Use kip1patch=nogc              // HOS 12.0.0+
-				((fuses & 0x4000) && (ctxt.pkg1_id->fuses <= 14))    // HOS 11.0.2+ fuses burnt.
+				((fuses & 0x4000) && (ctxt.pkg1_id->fuses <= 14))    // HOS 12.0.2+ fuses burnt.
 			  )
 			))
 			config_kip1patch(&ctxt, "nogc");
@@ -1057,7 +1059,7 @@ int hos_launch(ini_sec_t *cfg)
 	// Finalize per firmware key access. Skip access control if new exosphere.
 	switch (kb | (exo_new << 7))
 	{
-	case KB_FIRMWARE_VERSION_100_200:
+	case KB_FIRMWARE_VERSION_100:
 	case KB_FIRMWARE_VERSION_300:
 	case KB_FIRMWARE_VERSION_301:
 		se_key_acc_ctrl(12, SE_KEY_TBL_DIS_KEY_ACCESS_FLAG | SE_KEY_LOCK_FLAG);
